@@ -439,40 +439,29 @@ router.get('/ChooseCollege', function(req,res,next){
 // 添加专业
 router.post('/AddProfession', function(req,res,next){
   //
-  var profession = new Profession({
-    ProfessionName: req.body.ProfessionName
-  });
-  profession.save();
-  //
   College.findOne({CollegeName: req.body.CollegeName}, function(err,college){
     //
-    college.Professions.push(profession);
-    college.save();
+    var profession = new Profession({
+      ProfessionName: req.body.ProfessionName,
+      College: college._id
+    });
+    profession.save();
   });
 });
 // 选择专业
 router.get('/ChooseProfession', function(req,res,next){
   //
-  //Profession.find({}, function(err,profession){
-  //  if(err){
-  //    next(err);
-  //  } else{
-  //    res.json(profession);
-  //  }
-  //});
-  College.findOne({_id: req.query.CollegeId})
-      .populate('Professions')
-      .exec(function(err,colleges){
-        if(err){
-          next(err);
-        } else{
-          if(colleges){
-            res.json(colleges.Professions);
-          } else{
-            res.send('no');
-          }
-        }
-      });
+  Profession.find({College: req.query.CollegeId}, function(err,professions){
+    if(err){
+      next(err);
+    } else{
+      if(professions){
+        res.json(professions);
+      } else{
+        res.send('no');
+      }
+    }
+  });
 });
 // 添加班级
 router.post('/AddClass', function(req,res,next){
@@ -625,12 +614,17 @@ router.get('/ViewCollege', function(req,res,next){
 });
 // 查看某个学院的所有专业
 router.get('/ViewProfession', function(req,res,next){
-  College.findOne({_id: req.query.CollegeId})
-      .populate('Professions')
-      .exec(function(err,colleges){
-        if(err) next(err);
-        res.json(colleges.Professions);
-      });
+  Profession.find({College: req.query.CollegeId}, function(err,professions){
+    if(err){
+      next(err);
+    } else{
+      if(professions){
+        res.json(professions);
+      } else{
+        res.send('no');
+      }
+    }
+  });
 });
 // 查看某个专业的所有班级
 router.get('/ViewClasses', function(req,res,next){
@@ -1062,6 +1056,7 @@ router.put('/updateSubject', function(req,res,next){
 });
 
 
+// 学生旷课情况
 router.get('/getAbsenteeism', function(req,res,next){
   var Students = [];
   var Ctnot = 0;
@@ -1077,7 +1072,7 @@ router.get('/getAbsenteeism', function(req,res,next){
               callback2();
             }, function(err){
               if(err) next(err);
-              Students.push({StudentName: student.StudentName, Ctnot: Ctnot});
+              Students.push({Name: student.StudentName, Ctnot: Ctnot});
               callback1();
             });
           });
@@ -1091,12 +1086,13 @@ router.get('/getAbsenteeism', function(req,res,next){
   });
 });
 
+// 班级旷课情况
 router.get('/getAbsenteeismForClass', function(req,res,next){
   var Classes = [];
-  var Ctnot2 = 0;
 
   Class.find({Profession: req.query.ProfessionId}, function(err,classes){
     async.each(classes, function(cls, callback1){
+      var Ctnot2 = 0;
       var Ctnot = 0;
       Student.find({Classes:cls._id},function(err,students){
 
@@ -1119,7 +1115,7 @@ router.get('/getAbsenteeismForClass', function(req,res,next){
           //
         },function(err){
           Ctnot2 += Ctnot;
-          Classes.push({ClassName: cls.ClassName, Ctnot: Ctnot2});
+          Classes.push({Name: cls.ClassName, Ctnot: Ctnot2});
           callback1();
         })
 
@@ -1130,5 +1126,115 @@ router.get('/getAbsenteeismForClass', function(req,res,next){
   });
 });
 
+// 专业旷课情况
+router.get('/getAbsenteeismForProfession', function(req,res,next){
+  //
+  var Professions = [];
+  //
+  Profession.find({College: req.query.CollegeId}, function(err, professions){
+    //
+    async.each(professions, function(profession, callback1){
+      var ctnot_pro = 0;
+      //
+      Class.find({Profession: profession._id}, function(err, classes){
+        //
+        var ctnot_cls = 0;
+        async.each(classes, function(cls, callback2){
+          //
+          var ctnot_stu = 0;
+          Student.find({Classes:cls._id},function(err,students){
+
+            async.each(students,function(student,callback3){
+              //
+              SignIn.find({StaticsDate: {$gte: new Date(req.query.BeginDay)}, StaticsDate: {$lte: new Date(req.query.EndDay)}, Student: student._id},function(err,signins){
+                async.each(signins,function(signin,callback4){
+                  //
+                  ctnot_stu += signin.Ctnot;
+                  callback4();
+                  //
+                },function(err){
+                  //
+                  callback3();
+                  //
+                });
+              });
+              //
+            },function(err){
+              ctnot_cls += ctnot_stu;
+              callback2();
+            });
+          });
+        }, function(err){
+          ctnot_pro += ctnot_cls;
+          Professions.push({Name: profession.ProfessionName, Ctnot: ctnot_pro});
+          callback1();
+        });
+      });
+    }, function(err){
+      res.jsonp(Professions);
+    });
+  });
+
+});
+
+// 学院旷课情况
+router.get('/getAbsenteeismForCollege', function(req,res,next){
+  //
+  var Colleges = [];
+  //
+  College.find({}, function(err,colleges){
+    //
+    async.each(colleges, function(college, callback0){
+      //
+      var ctnot_col = 0;
+      var ctnot_pro = 0;
+      Profession.find({College: college._id}, function(err, professions){
+        //
+        async.each(professions, function(profession, callback1){
+          //
+          Class.find({Profession: profession._id}, function(err, classes){
+            //
+            var ctnot_cls = 0;
+            async.each(classes, function(cls, callback2){
+              //
+              var ctnot_stu = 0;
+              Student.find({Classes:cls._id},function(err,students){
+
+                async.each(students,function(student,callback3){
+                  //
+                  SignIn.find({StaticsDate: {$gte: new Date(req.query.BeginDay)}, StaticsDate: {$lte: new Date(req.query.EndDay)}, Student: student._id},function(err,signins){
+                    async.each(signins,function(signin,callback4){
+                      //
+                      ctnot_stu += signin.Ctnot;
+                      callback4();
+                      //
+                    },function(err){
+                      //
+                      callback3();
+                      //
+                    });
+                  });
+                  //
+                },function(err){
+                  ctnot_cls += ctnot_stu;
+                  callback2();
+                });
+              });
+            }, function(err){
+              ctnot_pro += ctnot_cls;
+              callback1();
+            });
+          });
+        }, function(err){
+          ctnot_col += ctnot_pro;
+          Colleges.push({Name: college.CollegeName, Ctnot: ctnot_col});
+          callback0();
+        });
+      });
+    }, function(err){
+      res.jsonp(Colleges);
+    });
+  });
+});
 
 module.exports = router;
