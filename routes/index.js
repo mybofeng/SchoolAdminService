@@ -257,37 +257,6 @@ async.each(arr,function(item, callback) {
 //});
 // **************************************************************************************
 
-// ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-var obj = xlsx.parse('public/files/kcb.xls');
-obj.forEach(function(item){
-  //console.log("name = "+item.name+" ; data = "+item.data);
-  //console.log(item.data[8][1]);
-  var excel = new Excel({
-    Name: item.name,
-    Data: item.data
-  });
-  //excel.save();
-});
-//
-Excel.findOne({Name: '14软件1（ACCP）'}, function(err,excel){
-  //
-  //console.log(excel.Data[8][10]);
-});
-// ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-
-// ==========================================================================================================
-//SignIn.find({ClassId: '55ed4d83100c389106ad7874', BeginSubjectDate: {$gte: new Date('2015-9-7')}, EndSubjectDate: {$lte: new Date()}}, function(err,signin){
-//  //console.log(signin);
-//  signin.forEach(function(item){
-//    //console.log(item.StudentId);
-//    var students = [];
-//    if(students.Contains(item.StudentId)){
-//      //
-//    }
-//  });
-//});
-// ==========================================================================================================
-
 // %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 // 教师上传学生信息表在数据库中添加学生
 router.post('/AddStudentIntoDB', function(req,res,next){
@@ -1234,6 +1203,31 @@ router.get('/getAbsenteeismForCollege', function(req,res,next){
     }, function(err){
       res.jsonp(Colleges);
     });
+  });
+});
+
+// 管理后台登陆
+router.post('/login', function(req,res,next){
+  Teacher.findOne({Number: req.body.Number, Password: req.body.Password}, function(err,teacher){
+    if(err){
+      next(err);
+    } else{
+      if(teacher != null){
+        res.jsonp(teacher);
+      } else{
+        Student.findOne({Number: req.body.Number, Password: req.body.Password, Purview: 4}, function(err, student){
+          if(err){
+            next(err);
+          } else{
+            if(student != null){
+              res.jsonp(student);
+            } else{
+              res.send('login fail');
+            }
+          }
+        });
+      }
+    }
   });
 });
 
