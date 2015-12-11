@@ -856,18 +856,24 @@ router.get('/getClassProject', function(req,res,next){
 });
 
 router.delete('/deleteSubject', function(req,res,next){
-  Subject.remove({ClassId: req.query.ClassId, BeginSubjectDate: new Date(req.query.BeginSubjectDate)}, function(err, subject){
-    if(err){
-      next(err);
-    } else{
-      SignIn.remove({Subject: subject._id}, function(err){
-        if(err){
-          next(err);
-        } else{
-          res.jsonp('delete finish');
-        }
+  console.log(new Date(req.query.BeginSubjectDate));
+  Subject.find({Class: req.query.ClassId, BeginSubjectDate: new Date(req.query.BeginSubjectDate)}, function(err, subjects){
+    console.log(subjects);
+    async.each(subjects, function(subject, callback1){
+      SignIn.find({Subject: subject._id}, function(err,signins){
+        async.each(signins, function(signin, callback2){
+          signin.remove();
+          callback2();
+        }, function(err){
+          if(err) next(err);
+          subject.remove();
+          callback1();
+        });
       });
-    }
+    }, function(err){
+      if(err) next(err);
+      res.jsonp('finish');
+    });
   });
 });
 
