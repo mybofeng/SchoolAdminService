@@ -278,34 +278,6 @@ router.post('/login', function(req,res,next){
     }
   });
 });
-//
-router.get('/login', function(req,res,next){
-  Teacher.findOne({Number: req.query.Number, Password: req.query.Password}, function(err,teacher){
-    if(err){
-      next(err);
-    } else{
-      if(teacher != null){
-        //
-        req.session.user_id = teacher._id;
-        res.jsonp(teacher);
-      } else{
-        Student.findOne({Number: req.query.Number, Password: req.query.Password, Purview: 4}, function(err, student){
-          if(err){
-            next(err);
-          } else{
-            if(student != null){
-              //
-              req.session.user_id = student._id;
-              res.jsonp(student);
-            } else{
-              res.send('login fail');
-            }
-          }
-        });
-      }
-    }
-  });
-});
 
 // 登出
 router.get('/logout', function(req,res,next){
@@ -379,6 +351,7 @@ router.post('/ImportSignIn', function(req,res,next){
   var BeginDay = new Date(req.body.BeginDay);
   //console.log(BeginDay);
   //console.log(req.body);
+  var iferror = false;
   //
  async.each(req.body.time, function(item, callback1) {
     //
@@ -431,47 +404,64 @@ router.post('/ImportSignIn', function(req,res,next){
         var ee = new Date(BeginDay.getFullYear()+'-'+(BeginDay.getMonth()+1)+"-"+BeginDay.getDate()+" "+item.EndSubjectDate);
         ee.setDate(BeginDay.getDate()+(parseInt(item.BeginWeek)-2+i)*7+(parseInt(item.TodayWeek)-1));
         //
-        Subject.create({
-          Class: classes._id,
-          Teacher: item.SubjectTeacher,
-          SubjectName: item.SubjectName,
-          BeginSubjectDate: dd, // 起始时间
-          EndSubjectDate: ee, // 结束时间
-          //AddressName: item.Build, // 教学楼
-          ClassRoomName: item.Build+"-"+item.ClassRoom, // 教室
+        Subject.findOne({ $or: [
+          {$or: [{ BeginSubjectDate: dd }, { EndSubjectDate: ee }]},
+          {$or: [{ BeginSubjectDate: ee }, { EndSubjectDate: dd }]}
+        ]}, function(err,subject){
+          console.info(subject);
+          if(subject != null){
+            iferror = true;
+            callback2();
+          } else{
+            //
+            Subject.create({
+              Class: classes._id,
+              Teacher: item.SubjectTeacher,
+              SubjectName: item.SubjectName,
+              BeginSubjectDate: dd, // 起始时间
+              EndSubjectDate: ee, // 结束时间
+              //AddressName: item.Build, // 教学楼
+              ClassRoomName: item.Build+"-"+item.ClassRoom, // 教室
 
-          Lat: Lat,
-          Lng: Lng
+              Lat: Lat,
+              Lng: Lng
 
-          },function(err,doc) {
-          if(err) next(err);
-          Student.find({Classes:classes._id}).exec(function(err,students) {
-            async.each(students, function (s, callback3) {
-              var signin = new SignIn({
-                Student: s._id,
-                Subject: doc._id,
-                FirstSignInState: 0,
-                SecondSignInState: 0
+            },function(err,doc) {
+              if(err) next(err);
+              Student.find({Classes:classes._id}).exec(function(err,students) {
+                async.each(students, function (s, callback3) {
+                  var signin = new SignIn({
+                    Student: s._id,
+                    Subject: doc._id,
+                    FirstSignInState: 0,
+                    SecondSignInState: 0
+                  });
+                  console.log(signin);
+                  signin.save(function (error, doc) {
+                    //
+                    console.log("name " + doc.Student);
+                    callback3();
+                    //
+                  });
+                }, function (err) {
+                  callback2()
+                });
               });
-              console.log(signin);
-              signin.save(function (error, doc) {
-                //
-                console.log("name " + doc.Student);
-                callback3();
-                //
-              });
-            }, function (err) {
-              callback2()
             });
-          });
+          }
         });
       },function(error){
         callback1();
       });
     });
   },function(err){
-   console.log("finish");
-    res.jsonp("finish");
+   if(iferror){
+     console.log("error");
+     res.jsonp("error");
+   } else{
+     console.log("finish");
+     res.jsonp("finish");
+   }
  });
 });
 
