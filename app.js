@@ -4,6 +4,7 @@ var favicon = require('serve-favicon');
 var logger = require('morgan');
 var cookieParser = require('cookie-parser');
 var bodyParser = require('body-parser');
+var session = require('express-session');
 
 var routes = require('./routes/index');
 var users = require('./routes/users');
@@ -28,15 +29,41 @@ app.use(logger('dev'));
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: false }));
 app.use(cookieParser());
+// session
+app.use(session({ secret: 'huyugui', cookie: {
+  expires: new Date(Date.now() + 60 * 10000),
+  maxAge: 60*10000
+},saveUninitialized: true,resave: true}));
+//
 app.use(express.static(path.join(__dirname, 'public')));
 
 app.all('*', function(req, res, next) {
-  res.header("Access-Control-Allow-Origin", "*");
+  // get
+  res.header('Access-Control-Allow-Credentials', true);
+  //
+  res.header("Access-Control-Expose-Headers", "Set-Cookie");
+  //
+  res.header("Access-Control-Allow-Origin", req.headers.origin || "*");
   res.header("Access-Control-Allow-Headers", "X-Requested-With");
   //
   res.header('Access-Control-Allow-Methods', 'POST, GET, OPTIONS, PUT, DELETE');
   res.header("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept");
   next();
+});
+
+// 拦截
+app.use(function (req, res, next) {
+  var url = req.originalUrl;
+  if(url.indexOf("getrandom") !=-1)
+  {
+    next();
+
+  }
+  else if (url.indexOf("login") ==-1 && !req.session.user_id) {
+    console.log("please login");
+    res.jsonp("please login");
+  }else
+    next();
 });
 
 app.use('/', routes);

@@ -1,5 +1,4 @@
 var express = require('express');
-var app = express();
 var router = express.Router();
 
 var async = require('async');
@@ -8,26 +7,15 @@ var xlsx = require('node-xlsx');
 
 var mongoose = require('mongoose');
 
-var jwt = require('jsonwebtoken'); // used to create, sign, and verify tokens
-var config = require('../config');
-
 // mongodb://linhehe:hyg&1qaz2wSX@113.31.89.205:27017/school
 // mongodb://linhehe:linhehe@113.31.89.205:27017/test
-//mongoose.connect('mongodb://linhehe:linhehe@113.31.89.205:27017/test', function(err){
-//  if(err){
-//    console.error(err);
-//  } else{
-//    console.log('mongodb connected');
-//  }
-//});
-mongoose.connect(config.database, function(err){
+mongoose.connect('mongodb://linhehe:linhehe@113.31.89.205:27017/test', function(err){
   if(err){
     console.error(err);
   } else{
     console.log('mongodb connected');
   }
-}); // connect to database
-app.set('superSecret', config.secret); // secret variable
+});
 
 require('../models/Students');
 require('../models/Teachers');
@@ -270,13 +258,8 @@ router.post('/login', function(req,res,next){
     } else{
       if(teacher != null){
         //
-        var token = jwt.sign(teacher, app.get('superSecret'), {
-          expiresInMinutes: 1440 // expires in 24 hours
-          //expiresIn: 1
-        });
-        //teacher['token'] = token;
-        //console.log(teacher);
-        res.jsonp({data: teacher, token: token});
+        req.session.user_id = teacher._id;
+        res.jsonp(teacher);
       } else{
         Student.findOne({Number: req.body.Number, Password: req.body.Password, Purview: 4}, function(err, student){
           if(err){
@@ -284,10 +267,35 @@ router.post('/login', function(req,res,next){
           } else{
             if(student != null){
               //
-              var token = jwt.sign(student, app.get('superSecret'), {
-                expiresInMinutes: 1440 // expires in 24 hours
-              });
-              student['token'] = token;
+              req.session.user_id = student._id;
+              res.jsonp(student);
+            } else{
+              res.send('login fail');
+            }
+          }
+        });
+      }
+    }
+  });
+});
+//
+router.get('/login', function(req,res,next){
+  Teacher.findOne({Number: req.query.Number, Password: req.query.Password}, function(err,teacher){
+    if(err){
+      next(err);
+    } else{
+      if(teacher != null){
+        //
+        req.session.user_id = teacher._id;
+        res.jsonp(teacher);
+      } else{
+        Student.findOne({Number: req.query.Number, Password: req.query.Password, Purview: 4}, function(err, student){
+          if(err){
+            next(err);
+          } else{
+            if(student != null){
+              //
+              req.session.user_id = student._id;
               res.jsonp(student);
             } else{
               res.send('login fail');
@@ -299,38 +307,11 @@ router.post('/login', function(req,res,next){
   });
 });
 
-// 验证
-router.use(function(req, res, next) {
-
-  // check header or url parameters or post parameters for token
-  var token = req.body.token || req.query.token || req.headers['x-access-token'];
-
-  // decode token
-  if (token) {
-
-    // verifies secret and checks exp
-    jwt.verify(token, app.get('superSecret'), function(err, decoded) {
-      if (err) {
-        return res.json({ success: false, message: 'Failed to authenticate token.' });
-      } else {
-        // if everything is good, save to request for use in other routes
-        req.decoded = decoded;
-        next();
-      }
-    });
-
-  } else {
-
-    // if there is no token
-    // return an error
-    return res.status(403).send({
-      success: false,
-      message: 'No token provided.'
-    });
-
-  }
+// 登出
+router.get('/logout', function(req,res,next){
+  req.session.user_id = null;
+  res.jsonp('success');
 });
-
 
 
 // %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
