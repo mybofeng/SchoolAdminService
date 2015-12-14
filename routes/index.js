@@ -812,59 +812,9 @@ router.post('/AddSubject', function(req,res,next){
 //      //
 //      //console.log(arr);
 //    });
-SignIn
-    //.find({TeacherName: '胡玉贵'}, {_id:0})
-    //.select('SubjectName')
-    //.select('TeacherName')
-    //.select('ClassId')
-    //.select('BeginSubjectDate')
-    .distinct('TeacherName')
-    .exec(function(err,signs){
-      //console.log(signs);
-      //var arr=[];
-      //async.each(signs, function(item,callback){
-      //  if(arr.length == 0){
-      //    arr.push(item)
-      //  } else{
-      //    for(var i=0; i<arr.length; i++){
-      //      if(arr[i].ClassId != item.ClassId){
-      //        arr.push(item);
-      //      }
-      //    }
-      //    callback();
-      //  }
-      //  console.log(arr);
-      //});
-    });
 router.get('/FindSubject', function(req,res,next){
   //
 });
-
-
-
-
-
-
-//for(var i=1; i<=60; i++){
-//  var student = new Student({
-//    StudentName: "测试账号"+i,
-//    Sex: "男",
-//    Number: "201511210"+i,
-//    Phone: "13726224169",
-//    QQ: "123456789",
-//    Dorm: "19#408",
-//    ID_card: "00000000000000000",
-//    Native: "广东省",
-//
-//    Classes: "565024d95234c69804a2530f",
-//    "Professions" : "55ed4e13d7d3839606a084a2",
-//    "Colleges" : "55ed4e76c5e8329906b14051",
-//
-//    ClassTeacher: "55ed546d5ef0f1be065579ce",
-//    FatherPhone: "13726224270",
-//    MotherPhone: "13726223041"
-//  });
-//}
 
 // 列出所有的任课教师
 router.get('/getTeacher', function(req,res,next){
@@ -1268,6 +1218,20 @@ router.get('/getAbsenteeismForCollege', function(req,res,next){
     }, function(err){
       res.jsonp(Colleges);
     });
+  });
+});
+
+// 纪委查看和修改本班学生旷课次数
+router.get('/showStudentSignIn', function(req,res,next){
+  SignIn.find({Student: req.query.StudentId, Subject: req.query.SubjectId}, function(err,signins){
+    if(err) next(err);
+    res.jsonp(signins);
+  });
+});
+router.put('/updateStudentCtnot', function(req,res,next){
+  SignIn.findOneAndUpdate({_id: req.body.SignInId}, {Ctnot: req.body.Ctnot}, function(err,signin){
+    if(err) next(err);
+    res.jsonp(signin);
   });
 });
 
