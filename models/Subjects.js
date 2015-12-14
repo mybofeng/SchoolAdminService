@@ -13,8 +13,10 @@ var SubjectSchema = new mongoose.Schema({
     ClassRoomName: String, // 教室名
     //Teacher :{type: mongoose.Schema.Types.ObjectId, ref: 'Teacher'},
     Teacher: String,
-    Class:{type: mongoose.Schema.Types.ObjectId, ref: 'Class'}
+    Class:{type: mongoose.Schema.Types.ObjectId, ref: 'Class'},
 
+    Lat: String,
+    Lng: String
 });
 
 mongoose.model('Subject', SubjectSchema);

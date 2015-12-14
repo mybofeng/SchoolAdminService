@@ -1,4 +1,5 @@
 var express = require('express');
+var app = express();
 var router = express.Router();
 
 var async = require('async');
@@ -6,23 +7,27 @@ var async = require('async');
 var xlsx = require('node-xlsx');
 
 var mongoose = require('mongoose');
-//mongoose.connect('mongodb://10.211.55.3/menage', function(err){
+
+var jwt = require('jsonwebtoken'); // used to create, sign, and verify tokens
+var config = require('../config');
+
+// mongodb://linhehe:hyg&1qaz2wSX@113.31.89.205:27017/school
+// mongodb://linhehe:linhehe@113.31.89.205:27017/test
+//mongoose.connect('mongodb://linhehe:linhehe@113.31.89.205:27017/test', function(err){
 //  if(err){
 //    console.error(err);
 //  } else{
-//    console.log('connect success');
+//    console.log('mongodb connected');
 //  }
 //});
-//
-// mongodb://linhehe:hyg&1qaz2wSX@113.31.89.205:27017/school
-// mongodb://linhehe:linhehe@113.31.89.205:27017/test
-mongoose.connect('mongodb://linhehe:linhehe@113.31.89.205:27017/test', function(err){
+mongoose.connect(config.database, function(err){
   if(err){
     console.error(err);
   } else{
     console.log('mongodb connected');
   }
-});
+}); // connect to database
+app.set('superSecret', config.secret); // secret variable
 
 require('../models/Students');
 require('../models/Teachers');
@@ -257,6 +262,77 @@ async.each(arr,function(item, callback) {
 //});
 // **************************************************************************************
 
+// 管理后台登陆
+router.post('/login', function(req,res,next){
+  Teacher.findOne({Number: req.body.Number, Password: req.body.Password}, function(err,teacher){
+    if(err){
+      next(err);
+    } else{
+      if(teacher != null){
+        //
+        var token = jwt.sign(teacher, app.get('superSecret'), {
+          expiresInMinutes: 1440 // expires in 24 hours
+          //expiresIn: 1
+        });
+        //teacher['token'] = token;
+        //console.log(teacher);
+        res.jsonp({data: teacher, token: token});
+      } else{
+        Student.findOne({Number: req.body.Number, Password: req.body.Password, Purview: 4}, function(err, student){
+          if(err){
+            next(err);
+          } else{
+            if(student != null){
+              //
+              var token = jwt.sign(student, app.get('superSecret'), {
+                expiresInMinutes: 1440 // expires in 24 hours
+              });
+              student['token'] = token;
+              res.jsonp(student);
+            } else{
+              res.send('login fail');
+            }
+          }
+        });
+      }
+    }
+  });
+});
+
+// 验证
+router.use(function(req, res, next) {
+
+  // check header or url parameters or post parameters for token
+  var token = req.body.token || req.query.token || req.headers['x-access-token'];
+
+  // decode token
+  if (token) {
+
+    // verifies secret and checks exp
+    jwt.verify(token, app.get('superSecret'), function(err, decoded) {
+      if (err) {
+        return res.json({ success: false, message: 'Failed to authenticate token.' });
+      } else {
+        // if everything is good, save to request for use in other routes
+        req.decoded = decoded;
+        next();
+      }
+    });
+
+  } else {
+
+    // if there is no token
+    // return an error
+    return res.status(403).send({
+      success: false,
+      message: 'No token provided.'
+    });
+
+  }
+});
+
+
+
 // %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 // 教师上传学生信息表在数据库中添加学生
 router.post('/AddStudentIntoDB', function(req,res,next){
@@ -316,12 +392,47 @@ router.get('/', function(req, res, next) {
 // 导入签到表
 router.post('/ImportSignIn', function(req,res,next){
   //
+  Subject.find({BeginSubjectDate:'', EndSubjectDate:''});
+  //
   //console.log(req.body);
   var BeginDay = new Date(req.body.BeginDay);
   //console.log(BeginDay);
   //console.log(req.body);
   //
  async.each(req.body.time, function(item, callback1) {
+    //
+   var Lat = '',
+       Lng = '';
+   switch (item.Build){
+     case 'J1':
+           Lat = '22.133278';
+           Lng = '113.356139';
+           break;
+     case 'J2':
+           Lat = '22.132985';
+           Lng = '113.3560';
+           break;
+     case 'J3':
+           Lat = '22.132709';
+           Lng = '113.356049';
+           break;
+     case 'S1':
+           Lat = '22.132885';
+           Lng = '113.35675';
+           break;
+     case 'S2':
+           Lat = '22.132885';
+           Lng = '113.356714';
+           break;
+     case 'S3':
+           Lat = '22.132634';
+           Lng = '113.356696';
+           break;
+     case 'S4':
+           Lat = '';
+           Lng = '';
+           break;
+   }
     //
     Class.findOne({ClassName: req.body.ClassName}, function(err,classes){
       //
@@ -346,7 +457,10 @@ router.post('/ImportSignIn', function(req,res,next){
           BeginSubjectDate: dd, // 起始时间
           EndSubjectDate: ee, // 结束时间
           //AddressName: item.Build, // 教学楼
-          ClassRoomName: item.Build+"-"+item.ClassRoom // 教室
+          ClassRoomName: item.Build+"-"+item.ClassRoom, // 教室
+
+          Lat: Lat,
+          Lng: Lng
 
           },function(err,doc) {
           if(err) next(err);
@@ -892,44 +1006,18 @@ router.get('/getProjectByProjectName', function(req,res,next){
 });
 
 router.post('/addaNewSubject', function(req,res,next){
-
-  Subject.create({
+  var subject = new Subject({
     BeginSubjectDate:Date, // 例：2015-8-1 8:10
     EndSubjectDate:Date, // 例：2015-8-1 9:50
     SubjectName: String,
     ClassRoomName: String, // 教室名
     //Teacher :{type: mongoose.Schema.Types.ObjectId, ref: 'Teacher'},
     Teacher: String,
-    Class:{type: mongoose.Schema.Types.ObjectId, ref: 'Class'}
-  }, function(err, subject){
+    Class:{type: mongoose.Schema.Types.ObjectId, ref: 'Class'},
     //
+    Lat: '',
+    Lng: ''
   });
-  //Class.findOne({_id: req.body.ClassId}, function(err,classes){
-  //  if(err){
-  //    next(err);
-  //  } else{
-  //    if(classes){
-  //      var stop_val = classes.Students.length;
-  //      for(var i=0; i<classes.Students.length; i++){
-  //        var sign = new SignIn({
-  //          StudentId: classes.Students[i],
-  //          ClassId: req.body.ClassId,
-  //          TeacherName: req.body.TeacherName,
-  //          SubjectName: req.body.SubjectName,
-  //          BeginSubjectDate: new Date(req.body.BeginSubjectDate), // 起始时间
-  //          EndSubjectDate: new Date(req.body.EndSubjectDate), // 结束时间
-  //          AddressName: req.body.AddressName, // 教学楼
-  //          ClassRoomName: req.body.ClassRoomName // 教室
-  //        });
-  //        sign.save();
-  //        if(i == stop_val){
-  //          console.log('finish');
-  //          res.jsonp('finish');
-  //        }
-  //      }
-  //    }
-  //  }
-  //});
 });
 
 
@@ -1209,31 +1297,6 @@ router.get('/getAbsenteeismForCollege', function(req,res,next){
     }, function(err){
       res.jsonp(Colleges);
     });
-  });
-});
-
-// 管理后台登陆
-router.post('/login', function(req,res,next){
-  Teacher.findOne({Number: req.body.Number, Password: req.body.Password}, function(err,teacher){
-    if(err){
-      next(err);
-    } else{
-      if(teacher != null){
-        res.jsonp(teacher);
-      } else{
-        Student.findOne({Number: req.body.Number, Password: req.body.Password, Purview: 4}, function(err, student){
-          if(err){
-            next(err);
-          } else{
-            if(student != null){
-              res.jsonp(student);
-            } else{
-              res.send('login fail');
-            }
-          }
-        });
-      }
-    }
   });
 });
 
